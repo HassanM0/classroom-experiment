@@ -185,6 +185,26 @@ io.on('connection', (socket) => {
         }
     });
 
+    socket.on('reset_game', (roomCode) => {
+        const room = rooms.get(roomCode);
+        if (!room || room.hostId !== socket.id) return;
+
+        room.gameState = 'LOBBY';
+        room.currentRound = 0;
+        room.messagesThisRound.clear();
+        room.history = [];
+
+        for (const [id, player] of room.players) {
+            player.role = null;
+            player.currentOpinion = null;
+            player.neighbors = [];
+            player.history = [];
+            player.score = null;
+        }
+
+        io.to(roomCode).emit('game_reset');
+        io.to(room.hostId).emit('host_update', getHostState(room));
+    });
 
     // ======== STUDENT ACTIONS ========
     socket.on('join_room', ({ playerName, roomCode }, callback) => {

@@ -11,7 +11,7 @@ export default function Home() {
         e.preventDefault();
         if (name.trim() && roomCode.trim()) {
             localStorage.setItem('studentName', name.trim());
-            navigate(`/room/${roomCode.trim().toUpperCase()}`);
+            navigate(`/room/${roomCode.trim().toUpperCase()}`, { state: { fromHome: true } });
         }
     };
 

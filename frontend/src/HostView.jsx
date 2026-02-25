@@ -121,11 +121,18 @@ export default function HostView() {
                     )}
                 </div>
 
-                {room.gameState === 'LOBBY' && (
-                    <button onClick={copyLink} className={`btn ${copied ? 'btn-secondary' : 'btn-primary'}`}>
-                        <Share2 size={16} /> {copied ? 'Copied URL!' : 'Copy Join Link'}
-                    </button>
-                )}
+                <div style={{ display: 'flex', gap: '1rem' }}>
+                    {room.gameState !== 'LOBBY' && (
+                        <button onClick={() => socket.emit('reset_game', room.code)} className="btn" style={{ background: 'var(--danger)', color: 'white', padding: '0.5rem 1rem' }}>
+                            Reset Game
+                        </button>
+                    )}
+                    {room.gameState === 'LOBBY' && (
+                        <button onClick={copyLink} className={`btn ${copied ? 'btn-secondary' : 'btn-primary'}`}>
+                            <Share2 size={16} /> {copied ? 'Copied URL!' : 'Copy Join Link'}
+                        </button>
+                    )}
+                </div>
             </div>
 
             {room.gameState === 'LOBBY' && (
@@ -191,6 +198,11 @@ export default function HostView() {
                     </div>
 
                     <div className="dashboard-grid" style={{ marginBottom: '2rem' }}>
+                        <div className="card" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+                            <h3 style={{ alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}><Share2 size={18} /> Network Graph</h3>
+                            <NetworkGraph players={playersArr} />
+                        </div>
+
                         <div className="card">
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Activity size={18} /> Live Network Feed</h3>
@@ -295,5 +307,72 @@ export default function HostView() {
                 </div>
             )}
         </div>
+    );
+}
+
+function NetworkGraph({ players }) {
+    if (!players || players.length === 0) return null;
+
+    const size = 300;
+    const center = size / 2;
+    const radius = 110;
+
+    const positions = {};
+    players.forEach((p, i) => {
+        const angle = (i / players.length) * 2 * Math.PI - Math.PI / 2;
+        positions[p.id] = {
+            x: center + radius * Math.cos(angle),
+            y: center + radius * Math.sin(angle)
+        };
+    });
+
+    return (
+        <svg width="100%" viewBox={`0 0 ${size} ${size}`} style={{ maxWidth: '300px', display: 'block', margin: '0 auto' }}>
+            {players.map(p =>
+                p.neighbors?.map(nId => {
+                    if (!positions[nId] || p.id > nId) return null; // Avoid drawing duplicate edges
+                    return (
+                        <line
+                            key={`${p.id}-${nId}`}
+                            x1={positions[p.id].x}
+                            y1={positions[p.id].y}
+                            x2={positions[nId].x}
+                            y2={positions[nId].y}
+                            stroke="rgba(255,255,255,0.15)"
+                            strokeWidth="2"
+                        />
+                    );
+                })
+            )}
+
+            {players.map(p => (
+                <g key={p.id} transform={`translate(${positions[p.id].x}, ${positions[p.id].y})`}>
+                    <circle
+                        r="14"
+                        fill={p.role === 'Truth-Seeker' ? 'var(--primary)' : 'var(--danger)'}
+                        stroke="var(--surface)"
+                        strokeWidth="2"
+                    />
+                    <text
+                        y="26"
+                        textAnchor="middle"
+                        fill="rgba(255,255,255,0.8)"
+                        fontSize="10px"
+                        fontWeight="500"
+                    >
+                        {p.name.substring(0, 8)}
+                    </text>
+                    <text
+                        y="4"
+                        textAnchor="middle"
+                        fill="white"
+                        fontSize="10px"
+                        fontWeight="bold"
+                    >
+                        {p.role ? p.role.substring(0, 1) : '?'}
+                    </text>
+                </g>
+            ))}
+        </svg>
     );
 }

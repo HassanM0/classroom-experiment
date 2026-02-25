@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
 import { Send, Clock, UserCheck, ShieldAlert, Cpu } from 'lucide-react';
 
@@ -8,28 +8,40 @@ const SOCKET_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
 export default function StudentView() {
     const { roomCode } = useParams();
     const navigate = useNavigate();
+    const location = useLocation();
     const [socket, setSocket] = useState(null);
 
+    // Identity State
+    const fromHome = location.state?.fromHome;
+    const initialName = localStorage.getItem('studentName') || '';
+    const [studentName, setStudentName] = useState(initialName);
+    const [hasName, setHasName] = useState(!!fromHome && !!initialName);
+
     // Game State
-    const [gameState, setGameState] = useState('CONNECTING'); // CONNECTING, LOBBY, PLAYING, ROUND_END, GAME_END
+    const [gameState, setGameState] = useState('CONNECTING'); // ENTER_NAME, CONNECTING, LOBBY, PLAYING, ROUND_END, GAME_END
     const [playerState, setPlayerState] = useState(null);
     const [error, setError] = useState('');
 
     // Round State
     const [currentRound, setCurrentRound] = useState(0);
     const [totalRounds, setTotalRounds] = useState(0);
-    const [messageInput, setMessageInput] = useState('');
+    const [messageInput, setMessageInput] = useState(50);
     const [hasSubmitted, setHasSubmitted] = useState(false);
     const [roundResult, setRoundResult] = useState(null);
 
     useEffect(() => {
-        const studentName = localStorage.getItem('studentName') || `Student_${Math.floor(Math.random() * 1000)}`;
+        if (!hasName) {
+            setGameState('ENTER_NAME');
+            return;
+        }
+
+        const finalName = studentName || `Student_${Math.floor(Math.random() * 1000)}`;
 
         const newSocket = io(SOCKET_URL);
         setSocket(newSocket);
 
         newSocket.on('connect', () => {
-            newSocket.emit('join_room', { playerName: studentName, roomCode: roomCode }, (res) => {
+            newSocket.emit('join_room', { playerName: finalName, roomCode: roomCode }, (res) => {
                 if (!res.success) {
                     setError(res.message);
                     setGameState('ERROR');
@@ -78,8 +90,26 @@ export default function StudentView() {
             setGameState('GAME_END');
         });
 
+        newSocket.on('game_reset', () => {
+            setGameState('LOBBY');
+            setPlayerState(null);
+            setCurrentRound(0);
+            setTotalRounds(0);
+            setRoundResult(null);
+            setHasSubmitted(false);
+        });
+
         return () => newSocket.disconnect();
-    }, [roomCode]);
+    }, [roomCode, hasName, studentName]);
+
+    const handleNameSubmit = (e) => {
+        e.preventDefault();
+        if (studentName.trim()) {
+            localStorage.setItem('studentName', studentName.trim());
+            setHasName(true);
+            setGameState('CONNECTING');
+        }
+    };
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -94,6 +124,28 @@ export default function StudentView() {
                     <h2 style={{ color: 'var(--danger)' }}>Error Joining</h2>
                     <p>{error}</p>
                     <button className="btn btn-primary mt-4" onClick={() => navigate('/')}>Back Home</button>
+                </div>
+            </div>
+        );
+    }
+
+    if (gameState === 'ENTER_NAME') {
+        return (
+            <div className="container" style={{ display: 'flex', justifyContent: 'center', marginTop: '4rem' }}>
+                <div className="card animate-fade-in" style={{ textAlign: 'center', maxWidth: '400px', width: '100%' }}>
+                    <h2>Enter Your Name</h2>
+                    <p>You need a name to join room <strong>{roomCode}</strong></p>
+                    <form onSubmit={handleNameSubmit} style={{ marginTop: '1.5rem', display: 'flex', gap: '0.5rem', flexDirection: 'column' }}>
+                        <input
+                            type="text"
+                            placeholder="Your Name"
+                            value={studentName}
+                            onChange={(e) => setStudentName(e.target.value)}
+                            required
+                            style={{ padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--surface-light)', background: 'var(--surface)', color: 'var(--text-color)', width: '100%' }}
+                        />
+                        <button type="submit" className="btn btn-primary" style={{ width: '100%' }}>Join Game</button>
+                    </form>
                 </div>
             </div>
         );
@@ -195,7 +247,7 @@ export default function StudentView() {
                                         type="range"
                                         min="1"
                                         max="100"
-                                        value={messageInput || 50}
+                                        value={messageInput}
                                         onChange={(e) => setMessageInput(e.target.value)}
                                         style={{ width: '100%', maxWidth: '300px' }}
                                     />
