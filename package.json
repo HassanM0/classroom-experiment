@@ -1,0 +1,19 @@
+{
+  "name": "strategic-comms-platform",
+  "version": "1.0.0",
+  "description": "Strategic Communication & Opinion Dynamics Classroom Experiment",
+  "main": "backend/server.js",
+  "scripts": {
+    "start": "node backend/server.js",
+    "build": "cd frontend && npm install && npm run build && cd ../backend && npm install && npm run postinstall",
+    "postinstall": "mkdir -p backend/public && cp -r frontend/dist/* backend/public/"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "socket.io": "^4.7.5"
+  }
+}
