@@ -338,7 +338,8 @@ function processRoundEnd(room) {
             newOpinion: player.currentOpinion,
             avgTruthSeekerOpinion: avgTSOpinion, // Spec: advocates see avg truth seeker opinion
             advocateMessages,
-            score: player.score
+            score: player.score,
+            history: player.history
         });
     }
 

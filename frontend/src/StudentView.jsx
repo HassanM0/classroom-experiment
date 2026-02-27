@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { io } from 'socket.io-client';
-import { Send, Clock, UserCheck, ShieldAlert, Cpu } from 'lucide-react';
+import { Send, Clock, UserCheck, ShieldAlert, Cpu, History } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const SOCKET_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
@@ -79,7 +80,16 @@ export default function StudentView() {
         newSocket.on('round_ended', (data) => {
             setRoundResult(data);
             if (playerState?.role === 'Truth-Seeker') {
-                setPlayerState(prev => ({ ...prev, currentOpinion: data.newOpinion }));
+                setPlayerState(prev => ({
+                    ...prev,
+                    currentOpinion: data.newOpinion,
+                    history: data.history
+                }));
+            } else {
+                setPlayerState(prev => ({
+                    ...prev,
+                    history: data.history
+                }));
             }
             setGameState('ROUND_END');
         });
@@ -262,7 +272,7 @@ export default function StudentView() {
                         {gameState === 'PLAYING' && hasSubmitted && (
                             <div style={{ textAlign: 'center', padding: '3rem 0' }}>
                                 <Cpu className="animate-pulse" size={48} style={{ color: 'var(--primary)', marginBottom: '1rem', display: 'inline-block' }} />
-                                <p>Waiting for other players to submit...</p>
+                                <p>Waiting for other players to submit their messages...</p>
                             </div>
                         )}
 
@@ -307,6 +317,60 @@ export default function StudentView() {
                                 </div>
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {/* History Panel - shown during ROUND_END or GAME_END */}
+            {(gameState === 'ROUND_END' || gameState === 'GAME_END') && playerState?.history?.length > 0 && (
+                <div className="card animate-slide-up" style={{ marginTop: '2rem', marginBottom: '2rem' }}>
+                    <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', borderBottom: '1px solid var(--surface-light)', paddingBottom: '0.5rem', marginBottom: '1rem' }}>
+                        <History size={18} color="var(--primary)" />
+                        Your History
+                    </h3>
+
+                    <div className="dashboard-grid">
+                        <div style={{ height: '300px', width: '100%', minWidth: 0 }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={playerState.history} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                                    <XAxis dataKey="round" stroke="var(--text-muted)" name="Round" />
+                                    <YAxis domain={[0, 100]} stroke="var(--text-muted)" />
+                                    <Tooltip
+                                        contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--surface-light)', color: 'white' }}
+                                        itemStyle={{ color: 'var(--primary)' }}
+                                    />
+                                    <Legend />
+                                    <ReferenceLine y={playerState.theta || playerState.thetaFinal} label="θ" stroke="var(--success)" strokeDasharray="3 3" />
+                                    {playerState.role === 'Advocate' && (
+                                        <ReferenceLine y={(playerState.theta || playerState.thetaFinal) + playerState.bias} label="Target" stroke="var(--accent)" strokeDasharray="3 3" />
+                                    )}
+                                    <Line type="monotone" dataKey="opinion" stroke="var(--primary)" strokeWidth={3} name="Opinion" activeDot={{ r: 8 }} />
+                                    <Line type="step" dataKey="sentMessage" stroke="var(--warning)" strokeWidth={2} name="Message Sent" strokeDasharray="5 5" />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </div>
+
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', textAlign: 'left', borderCollapse: 'collapse', fontSize: '0.9rem' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '1px solid var(--surface-light)' }}>
+                                        <th style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>Round</th>
+                                        <th style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>Opinion</th>
+                                        <th style={{ padding: '0.75rem', color: 'var(--text-muted)' }}>Message Sent</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {playerState.history.map((h, i) => (
+                                        <tr key={i} style={{ borderBottom: '1px solid rgba(255,255,255,0.02)' }}>
+                                            <td style={{ padding: '0.75rem' }}>{h.round}</td>
+                                            <td style={{ padding: '0.75rem', fontWeight: 'bold' }}>{Math.round(h.opinion * 10) / 10}</td>
+                                            <td style={{ padding: '0.75rem' }}>{h.sentMessage || '--'}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             )}

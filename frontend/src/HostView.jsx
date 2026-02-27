@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { io } from 'socket.io-client';
-import { Play, SkipForward, Search, Settings2, BarChart2, Share2, Eye, Activity } from 'lucide-react';
+import { Play, SkipForward, Search, Settings2, BarChart2, Share2, Eye, Activity, TrendingUp } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, ReferenceLine } from 'recharts';
 
 const SOCKET_URL = import.meta.env.DEV ? 'http://localhost:3001' : '';
 
@@ -108,6 +109,24 @@ export default function HostView() {
     const tsPlayers = playersArr.filter(p => p.role === 'Truth-Seeker');
     const advPlayers = playersArr.filter(p => p.role === 'Advocate');
 
+    // Compute aggregated chart data for Host
+    const chartData = [];
+    if (room.currentRound > 0) {
+        for (let r = 1; r <= room.currentRound; r++) {
+            let tsOpinions = [];
+            tsPlayers.forEach(p => {
+                const hist = p.history?.find(h => h.round === r);
+                if (hist && hist.opinion !== undefined) {
+                    tsOpinions.push(hist.opinion);
+                }
+            });
+            let avgTsOpinion = tsOpinions.length > 0 ? tsOpinions.reduce((a, b) => a + b, 0) / tsOpinions.length : null;
+
+            let dataPoint = { round: r, avgTruthSeekerOpinion: avgTsOpinion ? Number(avgTsOpinion.toFixed(2)) : null };
+            chartData.push(dataPoint);
+        }
+    }
+
     return (
         <div className="container" style={{ maxWidth: '1000px', paddingTop: '1rem' }}>
             {/* Header Info */}
@@ -203,7 +222,36 @@ export default function HostView() {
                             <NetworkGraph players={playersArr} />
                         </div>
 
-                        <div className="card">
+                        <div className="card" style={{ display: 'flex', flexDirection: 'column' }}>
+                            <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '1.5rem' }}>
+                                <TrendingUp size={18} color="var(--primary)" /> Opinion Dynamics
+                            </h3>
+                            <div style={{ flex: 1, minHeight: '300px', width: '100%', minWidth: 0 }}>
+                                {chartData.length > 0 ? (
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={chartData} margin={{ top: 10, right: 30, left: -20, bottom: 0 }}>
+                                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                                            <XAxis dataKey="round" stroke="var(--text-muted)" name="Round" />
+                                            <YAxis domain={[0, 100]} stroke="var(--text-muted)" />
+                                            <Tooltip
+                                                contentStyle={{ backgroundColor: 'var(--surface)', borderColor: 'var(--surface-light)', color: 'white' }}
+                                                itemStyle={{ color: 'var(--primary)' }}
+                                            />
+                                            <Legend />
+                                            <ReferenceLine y={room.params.theta} label="True State (θ)" stroke="var(--success)" strokeDasharray="3 3" />
+                                            <ReferenceLine y={Number(room.params.theta) + Number(room.params.bias)} label="Target" stroke="var(--accent)" strokeDasharray="3 3" />
+                                            <Line type="monotone" dataKey="avgTruthSeekerOpinion" stroke="var(--primary)" strokeWidth={3} name="Avg T-S Opinion" activeDot={{ r: 8 }} />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                ) : (
+                                    <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                        No data yet.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="card" style={{ gridColumn: '1 / -1' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                                 <h3 style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}><Activity size={18} /> Live Network Feed</h3>
                                 {room.gameState === 'ROUND_END' && (
